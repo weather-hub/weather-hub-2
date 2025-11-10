@@ -3,7 +3,7 @@ import os
 
 import requests
 from dotenv import load_dotenv
-from flask import Response, has_request_context, jsonify, session
+from flask import Response, jsonify
 from flask_login import current_user
 
 from app.modules.dataset.models import DataSet
@@ -20,24 +20,6 @@ load_dotenv()
 class ZenodoService(BaseService):
 
     def get_zenodo_url(self):
-        """Return the base URL for depositions.
-
-        Preference order:
-        - If the session indicates 'fakenodo', use FAKENODO_URL env var if present.
-        - Otherwise, use ZENODO_API_URL based on FLASK_ENV as before.
-        """
-        # If a per-session override was set (via the UI), honor it — but only when
-        # there is an active request context. Accessing `session` outside a
-        # request context raises a RuntimeError (this happens when CLI tools or
-        # app-start code import or construct services). We therefore guard with
-        # `has_request_context()`.
-        repo_choice = session.get("repository_service") if has_request_context() else None
-        if repo_choice == "fakenodo":
-            return os.getenv(
-                "FAKENODO_URL",
-                os.getenv("ZENODO_API_URL", "https://sandbox.zenodo.org/api/deposit/depositions"),
-            )
-
         FLASK_ENV = os.getenv("FLASK_ENV", "development")
         if FLASK_ENV == "development":
             return os.getenv("ZENODO_API_URL", "https://sandbox.zenodo.org/api/deposit/depositions")

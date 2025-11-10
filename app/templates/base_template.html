@@ -116,25 +116,6 @@ chico sundermann">
                         Options
                     </li>
 
-                    <li class="sidebar-item">
-                        {# Repository selector: choose between Zenodo and FakeNODO #}
-                        {% set repo_choice = session.get('repository_service', 'zenodo') %}
-                        <div class="px-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="repo_choice" id="repo_zenodo"
-                                       value="zenodo" {% if repo_choice == 'zenodo' %}checked{% endif %}
-                                       onclick="setRepository('zenodo')">
-                                <label class="form-check-label" for="repo_zenodo">Zenodo</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="repo_choice" id="repo_fakenodo"
-                                       value="fakenodo" {% if repo_choice == 'fakenodo' %}checked{% endif %}
-                                       onclick="setRepository('fakenodo')">
-                                <label class="form-check-label" for="repo_fakenodo">FakeNODO</label>
-                            </div>
-                        </div>
-                    </li>
-
                     <li class="sidebar-item {{ 'active' if request.endpoint == 'profile.edit_profile' else '' }}">
                         <a class="sidebar-link" href="{{ url_for('profile.edit_profile') }}">
                             <i class="align-middle" data-feather="user"></i> <span
