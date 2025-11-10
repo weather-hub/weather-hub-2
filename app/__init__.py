@@ -25,6 +25,29 @@ def create_app(config_name="development"):
     # Load configuration according to environment
     config_manager = ConfigManager(app)
     config_manager.load_config(config_name=config_name)
+    
+    def _to_bool(val, default=False):
+        if val is None:
+            return default
+        return str(val).lower() in ("1", "true", "yes", "on")
+
+    app.config.update(
+        MAIL_SERVER=os.getenv("MAIL_SERVER", app.config.get("MAIL_SERVER", "localhost")),
+        MAIL_PORT=int(os.getenv("MAIL_PORT", app.config.get("MAIL_PORT", 25))),
+        MAIL_USERNAME=os.getenv("MAIL_USERNAME", app.config.get("MAIL_USERNAME")),
+        MAIL_PASSWORD=os.getenv("MAIL_PASSWORD", app.config.get("MAIL_PASSWORD")),
+        MAIL_USE_TLS=_to_bool(os.getenv("MAIL_USE_TLS", app.config.get("MAIL_USE_TLS", True))),
+        MAIL_USE_SSL=_to_bool(os.getenv("MAIL_USE_SSL", app.config.get("MAIL_USE_SSL", False))),
+        MAIL_DEFAULT_SENDER=os.getenv(
+            "MAIL_DEFAULT_SENDER", app.config.get("MAIL_DEFAULT_SENDER", "no-reply@example.com")
+        ),
+        MAIL_SUPPRESS_SEND=_to_bool(os.getenv("MAIL_SUPPRESS_SEND", app.config.get("MAIL_SUPPRESS_SEND", False))),
+    )
+
+    # Initialize mail service
+    # Import here to avoid potential circular imports at module import time
+    from app.modules.notifications.service import init_mail
+    init_mail(app)
 
     # Initialize SQLAlchemy and Migrate with the app
     db.init_app(app)
