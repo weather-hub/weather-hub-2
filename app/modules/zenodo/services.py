@@ -139,16 +139,17 @@ class ZenodoService(BaseService):
         """
 
         logger.info("Dataset sending to Zenodo...")
-        logger.info(f"Publication type...{dataset.ds_meta_data.publication_type.value}")
+        # publication_type is stored in the DB as an Enum whose .name maps to the
+        # tokens defined in the DB migration (e.g. 'NONE', 'OTHER'). For Zenodo we
+        # need the lowercase token (e.g. 'none', 'other'), so use `.name.lower()`
+        # which is stable regardless of whether seeders use .name or .value.
+        pub_type_normalized = dataset.ds_meta_data.publication_type.name.lower()
+        logger.info(f"Publication type...{pub_type_normalized}")
 
         metadata = {
             "title": dataset.ds_meta_data.title,
-            "upload_type": "dataset" if dataset.ds_meta_data.publication_type.value == "none" else "publication",
-            "publication_type": (
-                dataset.ds_meta_data.publication_type.value
-                if dataset.ds_meta_data.publication_type.value != "none"
-                else None
-            ),
+            "upload_type": "dataset" if pub_type_normalized == "none" else "publication",
+            "publication_type": (pub_type_normalized if pub_type_normalized != "none" else None),
             "description": dataset.ds_meta_data.description,
             "creators": [
                 {
