@@ -34,35 +34,37 @@ dsmetadata_service = DSMetaDataService()
 
 
 class FakenodoAdapter:
-    """Adapter that exposes create_new_deposition, upload_file, publish_deposition
-    and get_doi so the rest of the code doesn't need to change.
+    """Minimal adapter around the in-memory FakenodoService.
+
+    Purpose: expose the small subset of methods the rest of the app expects
+    (create_new_deposition, upload_file, publish_deposition, get_doi) while
+    keeping file-reading logic local to this adapter.
     """
 
     def __init__(self, working_dir: str | None = None):
         self.service = FakenodoService(working_dir=working_dir)
 
     def create_new_deposition(self, dataset) -> dict:
-        metadata = {
-            "title": getattr(dataset, "title", f"dataset-{getattr(dataset, 'id', '')}"),
-        }
-        rec = self.service.create_deposition(metadata=metadata)
+        title = getattr(dataset, "title", f"dataset-{getattr(dataset, 'id', '')}")
+        rec = self.service.create_deposition(metadata={"title": title})
         return {"id": rec["id"], "conceptrecid": True, "metadata": rec.get("metadata", {})}
 
-    def upload_file(self, dataset, deposition_id, feature_model) -> Optional[dict]:
-
-        name = getattr(feature_model, "filename", None) or getattr(feature_model, "name", None)
+    def _read_feature_model_content(self, feature_model) -> Optional[bytes]:
+        """Return file bytes for the given feature_model or None if not available."""
         path = getattr(feature_model, "file_path", None) or getattr(feature_model, "path", None)
-        content = None
+        if not path:
+            return None
         try:
-            if path and os.path.exists(path):
-                with open(path, "rb") as fh:
-                    content = fh.read()
+            with open(path, "rb") as fh:
+                return fh.read()
         except Exception:
-            content = None
+            return None
 
+    def upload_file(self, dataset, deposition_id, feature_model) -> Optional[dict]:
+        name = getattr(feature_model, "filename", None) or getattr(feature_model, "name", None)
         if not name:
             name = f"feature_model_{getattr(feature_model, 'id', uuid.uuid4())}.bin"
-
+        content = self._read_feature_model_content(feature_model)
         return self.service.upload_file(deposition_id, name, content)
 
     def publish_deposition(self, deposition_id):
@@ -76,9 +78,7 @@ class FakenodoAdapter:
         if doi:
             return doi
         versions = rec.get("versions") or []
-        if versions:
-            return versions[-1].get("doi")
-        return None
+        return versions[-1].get("doi") if versions else None
 
 
 zenodo_service = FakenodoAdapter()
@@ -90,69 +90,83 @@ ds_view_record_service = DSViewRecordService()
 @login_required
 def create_dataset():
     form = DataSetForm()
-    if request.method == "POST":
-        dataset = None
+    if request.method != "POST":
+        return render_template("dataset/upload_dataset.html", form=form)
 
-        if not form.validate_on_submit():
-            return jsonify({"message": form.errors}), 400
+    # POST handler
+    if not form.validate_on_submit():
+        return jsonify({"message": form.errors}), 400
 
-        try:
-            logger.info("Creating dataset...")
-            dataset = dataset_service.create_from_form(form=form, current_user=current_user)
-            logger.info(f"Created dataset: {dataset}")
-            dataset_service.move_feature_models(dataset)
-        except ValueError as e:
-            # Business / validation error (e.g. our validate_dataset_package raised ValueError)
-            logger.info(f"Validation error while creating dataset: {e}")
-            return jsonify({"message": str(e)}), 400
+    dataset = None
+    try:
+        logger.info("Creating dataset...")
+        dataset = dataset_service.create_from_form(form=form, current_user=current_user)
+        logger.info(f"Created dataset: {dataset}")
 
-        except Exception:
-            # Unexpected error: log full trace, return generic message to client
-            logger.exception("Exception while creating dataset")
-            # For security do not leak internal trace to client; return generic message.
-            return jsonify({"message": "Internal server error while creating dataset"}), 500
+        # Move files from user's temp folder into permanent upload location
+        dataset_service.move_feature_models(dataset)
 
-        # send dataset as deposition to Zenodo
+    except ValueError as e:
+        logger.info(f"Validation error while creating dataset: {e}")
+        return jsonify({"message": str(e)}), 400
+    except Exception:
+        logger.exception("Exception while creating dataset")
+        return jsonify({"message": "Internal server error while creating dataset"}), 500
+
+    # Perform Zenodo/Fakenodo flow (create deposition, upload files, publish, update DOI)
+    zenodo_response = _perform_zenodo_flow(dataset)
+    if isinstance(zenodo_response, tuple):
+        # helper returned a Flask response (e.g. upload/publish error)
+        return zenodo_response
+
+    # Cleanup temp folder
+    _cleanup_user_temp(current_user)
+
+    return jsonify({"message": "Everything works!"}), 200
+
+
+def _perform_zenodo_flow(dataset):
+    """Create deposition and push feature models to Zenodo (or Fakenodo adapter).
+
+    Returns None on success, or a Flask response (body, status) when a recoverable
+    error occurs that the original code returned as 200 with a message.
+    """
+    data = {}
+    try:
+        zenodo_response_json = zenodo_service.create_new_deposition(dataset)
+        data = json.loads(json.dumps(zenodo_response_json))
+    except Exception as exc:
+        logger.exception(f"Exception while create dataset data in Zenodo {exc}")
         data = {}
-        try:
-            zenodo_response_json = zenodo_service.create_new_deposition(dataset)
-            response_data = json.dumps(zenodo_response_json)
-            data = json.loads(response_data)
-        except Exception as exc:
-            data = {}
-            zenodo_response_json = {}
-            logger.exception(f"Exception while create dataset data in Zenodo {exc}")
 
-        if data.get("conceptrecid"):
-            deposition_id = data.get("id")
+    if not data.get("conceptrecid"):
+        return None
 
-            # update dataset with deposition id in Zenodo
-            dataset_service.update_dsmetadata(dataset.ds_meta_data_id, deposition_id=deposition_id)
+    deposition_id = data.get("id")
+    dataset_service.update_dsmetadata(dataset.ds_meta_data_id, deposition_id=deposition_id)
 
-            try:
-                # iterate for each feature model (one feature model = one request to Zenodo)
-                for feature_model in dataset.feature_models:
-                    zenodo_service.upload_file(dataset, deposition_id, feature_model)
+    try:
+        for feature_model in dataset.feature_models:
+            zenodo_service.upload_file(dataset, deposition_id, feature_model)
 
-                # publish deposition
-                zenodo_service.publish_deposition(deposition_id)
+        zenodo_service.publish_deposition(deposition_id)
 
-                # update DOI
-                deposition_doi = zenodo_service.get_doi(deposition_id)
-                dataset_service.update_dsmetadata(dataset.ds_meta_data_id, dataset_doi=deposition_doi)
-            except Exception as e:
-                msg = f"it has not been possible upload feature models in Zenodo and update the DOI: {e}"
-                return jsonify({"message": msg}), 200
-
-        # Delete temp folder
-        file_path = current_user.temp_folder()
-        if os.path.exists(file_path) and os.path.isdir(file_path):
-            shutil.rmtree(file_path)
-
-        msg = "Everything works!"
+        deposition_doi = zenodo_service.get_doi(deposition_id)
+        dataset_service.update_dsmetadata(dataset.ds_meta_data_id, dataset_doi=deposition_doi)
+    except Exception as e:
+        msg = f"it has not been possible upload feature models in Zenodo and update the DOI: {e}"
         return jsonify({"message": msg}), 200
 
-    return render_template("dataset/upload_dataset.html", form=form)
+    return None
+
+
+def _cleanup_user_temp(user):
+    file_path = user.temp_folder()
+    if os.path.exists(file_path) and os.path.isdir(file_path):
+        try:
+            shutil.rmtree(file_path)
+        except Exception:
+            logger.exception(f"Failed to remove temp folder: {file_path}")
 
 
 @dataset_bp.route("/dataset/list", methods=["GET", "POST"])

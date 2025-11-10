@@ -44,7 +44,7 @@ entrypoint.sh
 # ==========================
 uploads/
 test_file.txt
-
+fakenodo_db.json
 # ==========================
 # Vagrant
 # ==========================
