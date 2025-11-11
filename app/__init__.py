@@ -46,6 +46,7 @@ def create_app(config_name="development"):
     # Initialize mail service
     # Import here to avoid potential circular imports at module import time
     from app.modules.notifications.service import init_mail
+
     init_mail(app)
 
     # Initialize SQLAlchemy and Migrate with the app

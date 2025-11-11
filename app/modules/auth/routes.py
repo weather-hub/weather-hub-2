@@ -87,7 +87,7 @@ def verify_2fa():
 
     if request.method == "POST" and form.validate_on_submit():
         otp = form.otp_code.data
-        import pyotp   # type: ignore
+        import pyotp  # type: ignore
 
         totp = pyotp.TOTP(user.otp_secret)
         if totp.verify(otp):
