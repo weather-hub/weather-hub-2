@@ -10,6 +10,7 @@ def init_mail(app):
 
 
 def send_email(subject, recipients, body):
+    print(f"send_email called with subject: {subject}, recipients: {recipients}")
     """Envía un correo utilizando Flask-Mail."""
     msg = Message(subject, recipients=recipients, body=body)
     with current_app.app_context():
