@@ -4,6 +4,7 @@ from flask_login import current_user, login_user, logout_user
 from app.modules.auth import auth_bp
 from app.modules.auth.forms import LoginForm, SignupForm, Verify2FAForm
 from app.modules.auth.services import AuthenticationService
+from app.modules.notifications.service import send_email
 from app.modules.profile.services import UserProfileService
 
 authentication_service = AuthenticationService()
@@ -26,7 +27,19 @@ def show_signup_form():
         except Exception as exc:
             return render_template("auth/signup_form.html", form=form, error=f"Error creating user: {exc}")
 
-        # Log user
+        # Send a simple confirmation email stating the address is valid.
+        try:
+            subject = "Tu correo es válido - WeatherHub"
+            body = (
+                "Hola,\n\nSi estás viendo este correo, tu dirección de correo es válida. "
+                "Gracias por usar WeatherHub.\n\n— El equipo de WeatherHub"
+            )
+            send_email(subject, [user.email], body)
+        except Exception:
+            # Don't block signup if email sending fails; just continue.
+            pass
+
+        # Log user in and redirect to home
         login_user(user, remember=True)
         return redirect(url_for("public.index"))
 
@@ -73,7 +86,7 @@ def verify_2fa():
 
     if request.method == "POST" and form.validate_on_submit():
         otp = form.otp_code.data
-        import pyotp
+        import pyotp  # type: ignore
 
         totp = pyotp.TOTP(user.otp_secret)
         if totp.verify(otp):

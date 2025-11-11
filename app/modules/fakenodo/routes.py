@@ -6,7 +6,7 @@ from app.modules.fakenodo.services import FakenodoService
 _service = FakenodoService()
 
 
-@fakenodo_bp.route("/", methods=["GET"])
+@fakenodo_bp.route("/fakenodo", methods=["GET"])
 def test_connection_fakenodo():
     return jsonify({"status": "success", "message": "Connected to FakenodoAPI"})
 
