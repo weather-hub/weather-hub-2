@@ -4,9 +4,8 @@ from flask_login import current_user, login_user, logout_user
 from app.modules.auth import auth_bp
 from app.modules.auth.forms import LoginForm, SignupForm, Verify2FAForm
 from app.modules.auth.services import AuthenticationService
-from app.modules.profile.services import UserProfileService
 from app.modules.notifications.service import send_email
-
+from app.modules.profile.services import UserProfileService
 
 authentication_service = AuthenticationService()
 user_profile_service = UserProfileService()
