@@ -1,0 +1,192 @@
+{% extends "base_template.html" %}
+
+
+{% block title %}Active Sessions{% endblock %}
+
+
+{% block content %}
+
+
+<div class="container mt-4">
+   <div class="row mb-4">
+       <div class="col-12">
+           <h1 class="h3 mb-3">
+               <i class="fa fa-shield-alt"></i> Active Sessions Management
+           </h1>
+           <p class="text-muted">View and manage your active sessions across different devices for enhanced security.</p>
+       </div>
+   </div>
+
+
+   {% with messages = get_flashed_messages(with_categories=true) %}
+       {% if messages %}
+           {% for category, message in messages %}
+               <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                   {{ message }}
+                   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+               </div>
+           {% endfor %}
+       {% endif %}
+   {% endwith %}
+
+
+   <div class="row">
+       <div class="col-12">
+           {% if sessions %}
+               <div class="card shadow-sm">
+                   <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                       <h5 class="card-title mb-0">
+                           <i class="fa fa-desktop"></i> Active Sessions ({{ sessions|length }})
+                       </h5>
+                       <div class="btn-group" role="group" aria-label="session-actions">
+                           {% if sessions|length > 1 %}
+                           <form method="POST" action="{{ url_for('auth.close_all_sessions') }}" style="display: inline;">
+                               <button type="submit" class="btn btn-sm btn-danger"
+                                       onclick="return confirm('Are you sure you want to close all other sessions? You will remain logged in on this device.');">
+                                   <i class="fa fa-times-circle"></i> Close All Other Sessions
+                               </button>
+                           </form>
+                           {% endif %}
+
+                           <!-- Refresh button to force the browser to re-check session state -->
+                           <button id="refreshSessionsBtn" type="button" class="btn btn-sm btn-outline-secondary" title="Refresh sessions list">
+                               <i class="fa fa-sync"></i> Refresh
+                           </button>
+                       </div>
+                   </div>
+                   <div class="card-body p-0">
+                       <div class="table-responsive">
+                           <table class="table table-hover mb-0">
+                               <thead class="table-light">
+                                   <tr>
+                                       <th style="width: 5%"><i class="fa fa-info-circle"></i></th>
+                                       <th style="width: 20%">Device</th>
+                                       <th style="width: 15%">Browser</th>
+                                       <th style="width: 15%">Operating System</th>
+                                       <th style="width: 15%">IP Address</th>
+                                       <th style="width: 15%">Last Activity</th>
+                                       <th style="width: 15%">Actions</th>
+                                   </tr>
+                               </thead>
+                               <tbody>
+                                   {% for session_item in sessions %}
+                                   <tr {% if session_item.is_current_session(current_session_id) %}class="table-success"{% endif %}>
+                                       <td>
+                                           {% if session_item.is_current_session(current_session_id) %}
+                                               <span class="badge bg-success" title="Current session">
+                                                   <i class="fa fa-check-circle"></i>
+                                               </span>
+                                           {% else %}
+                                               <i class="fa fa-circle text-muted"></i>
+                                           {% endif %}
+                                       </td>
+                                       <td>
+                                           <i class="fa fa-{{ 'mobile' if 'Mobile' in session_item.device_info else 'tablet' if 'Tablet' in session_item.device_info else 'desktop' }}"></i>
+                                           {{ session_item.device_info }}
+                                           {% if session_item.is_current_session(current_session_id) %}
+                                               <br><small class="text-success"><strong>Current Device</strong></small>
+                                           {% endif %}
+                                       </td>
+                                       <td>{{ session_item.get_browser_name() }}</td>
+                                       <td>{{ session_item.get_os_name() }}</td>
+                                       <td>
+                                           <code>{{ session_item.ip_address or 'N/A' }}</code>
+                                       </td>
+                                       <td>
+                                           <small class="text-muted">
+                                               {{ session_item.last_activity.strftime('%Y-%m-%d %H:%M:%S') }} UTC
+                                           </small>
+                                       </td>
+                                       <td>
+                                           {% if session_item.is_current_session(current_session_id) %}
+                                               <button class="btn btn-sm btn-secondary" disabled>
+                                                   <i class="fa fa-check"></i> Current
+                                               </button>
+                                           {% else %}
+                                               <form method="POST" action="{{ url_for('auth.close_session', session_id=session_item.session_id) }}" style="display: inline;">
+                                                   <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                           onclick="return confirm('Are you sure you want to close this session?');">
+                                                       <i class="fa fa-times"></i> Close
+                                                   </button>
+                                               </form>
+                                           {% endif %}
+                                       </td>
+                                   </tr>
+                                   {% endfor %}
+                               </tbody>
+                           </table>
+                       </div>
+                   </div>
+                   <div class="card-footer text-muted">
+                       <small>
+                           <i class="fa fa-info-circle"></i>
+                           Sessions are automatically deactivated after 30 days of inactivity.
+                           If you notice any suspicious activity, close those sessions immediately and change your password.
+                       </small>
+                   </div>
+               </div>
+
+
+               <div class="row mt-4">
+                   <div class="col-12">
+                       <div class="alert alert-info" role="alert">
+                           <h5 class="alert-heading"><i class="fa fa-shield-alt"></i> Security Tips</h5>
+                           <ul class="mb-0">
+                               <li>Review your active sessions regularly</li>
+                               <li>Close sessions from devices you no longer use</li>
+                               <li>If you see unfamiliar sessions, close them immediately and change your password</li>
+                               <li>Always log out when using shared or public computers</li>
+                           </ul>
+                       </div>
+                   </div>
+               </div>
+
+
+           {% else %}
+               <div class="alert alert-warning" role="alert">
+                   <i class="fa fa-exclamation-triangle"></i> No active sessions found.
+               </div>
+           {% endif %}
+       </div>
+   </div>
+
+
+   <div class="row mt-3">
+       <div class="col-12">
+           <a href="{{ url_for('profile.my_profile') }}" class="btn btn-secondary">
+               <i class="fa fa-arrow-left"></i> Back to Profile
+           </a>
+       </div>
+   </div>
+</div>
+
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+   // Auto-dismiss alerts after 5 seconds
+   window.setTimeout(function() {
+       $(".alert").fadeTo(500, 0).slideUp(500, function(){
+           $(this).remove();
+       });
+   }, 5000);
+
+   // Refresh sessions button: disable while reloading to avoid multiple clicks
+   document.addEventListener('DOMContentLoaded', function() {
+       var btn = document.getElementById('refreshSessionsBtn');
+       if (btn) {
+           btn.addEventListener('click', function() {
+               btn.disabled = true;
+               var icon = btn.querySelector('i');
+               if (icon) {
+                   icon.classList.add('fa-spin');
+               }
+               // Force a reload so the before_request handler runs and updates auth state
+               window.location.reload();
+           });
+       }
+   });
+</script>
+{% endblock %}
