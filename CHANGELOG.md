@@ -116,9 +116,7 @@
 ## Fixes
 
 - fix: add missing logs for email server
-- fix: add missing logs for email server
 - fix: added missing logs in email
-- fix: Fixed email errors and server bug
 - fix: email server fixed
 - fix: Fixed email errors
 - fix: added test
@@ -271,8 +269,6 @@
 
 ## Others
 
-- chore: update changelog [skip ci]
-- chore: bump version [skip ci]
 - chore: update changelog [skip ci]
 - chore: bump version [skip ci]
 - chore: update changelog [skip ci]
