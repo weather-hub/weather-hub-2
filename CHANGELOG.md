@@ -115,7 +115,6 @@
 
 ## Fixes
 
-- fix: Fixed email errors and server bug
 - fix: email server fixed
 - fix: Fixed email errors
 - fix: added test
