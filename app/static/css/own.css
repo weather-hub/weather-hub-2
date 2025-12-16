@@ -185,3 +185,30 @@
     padding: 5px;
     border-radius: 3px;
 }
+
+.sidebar,
+.sidebar-content {
+    background: #1e3a2e !important; /* Verde oscuro */
+}
+
+.sidebar-link,
+a.sidebar-link {
+    background: #1e3a2e !important; /* Verde oscuro */
+}
+
+.sidebar-link:hover {
+    background: #2d4a3a !important; /* Verde un poco más claro al hover */
+}
+
+.sidebar-item.active .sidebar-link:hover,
+.sidebar-item.active > .sidebar-link {
+    background: linear-gradient(90deg, rgba(40, 167, 69, 0.1), rgba(40, 167, 69, 0.088) 50%, transparent) !important;
+    border-left-color: #28a745 !important; /* Verde para el borde activo */
+    color: #e9ecef !important;
+}
+
+.sidebar-toggle:hover .hamburger,
+.sidebar-toggle:hover .hamburger:after,
+.sidebar-toggle:hover .hamburger:before {
+    background: #28a745 !important; /* Verde para el toggle */
+}
